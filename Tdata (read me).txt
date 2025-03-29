@@ -1,0 +1,35 @@
+This dataset consists of multiple samples and their corresponding labels. Each sample contains ten normalized (per-unit, p.u.) features, described as follows:
+Due to file size limitations, the file provided here is compressed in Parquet format, where the first 10 columns are sample data and the last column is label data.
+
+1）Feature Composition:
+• The first column corresponds to the stator a-axis current (isα);
+• The second column corresponds to the stator β-axis current (isβ);
+• The third column corresponds to the stator a-axis voltage (usα);
+• The fourth column corresponds to the stator β-axis voltage (usβ);
+• The fifth column corresponds to the stator d-axis current (isd);
+• The sixth column corresponds to the stator q-axis current (isq);
+• The seventh column corresponds to the stator d-axis voltage (usd);
+• The eighth column corresponds to the stator q-axis voltage (usq);
+• The ninth column corresponds to the motor synchronous speed;
+• The tenth column corresponds to the motor speed reference.
+All current values are normalized with respect to the motor's rated current (5.0 A), voltage values are normalized with respect to the rated phase voltage (220 V), and the synchronous speed and speed reference are normalized based on the motor's rated frequency (50 Hz).
+
+2）Label Composition:
+The label represents the per-unit value of the torque reference, normalized with respect to the rated torque (7.0 N*m).
+
+3）Dataset Loading Code:
+The dataset can be loaded using the following code:
+----------------------------------------------------------------
+import pandas as pd
+df = pd.read_parquet('Tdata_compressed.parquet')
+----------------------------------------------------------------
+
+4）Data Sampling Process
+Since our ultimate objective is to enable adaptive adjustment of the d-axis current reference based on the actual load torque magnitude, thereby enhancing the overall efficiency of the motor system, it is critical to ensure comprehensive training data collection. Therefore, in addition to collecting data under varying rotational speeds and load torque conditions, training data under different d-axis current references must also be acquired to guarantee the completeness of the network learning. To achieve this, we have designed the detailed data acquisition procedure as follows. Among them, the range of relevant parameter settings is: speed reference: 0~0.5 Hz, with a step size of 0.1 Hz; Load torque: 0~±7 N*m (TN=7 N*m), with a step size of 0.7 N*m; D-axis current reference: 2.5A~5.0 A (iN=5.0 A), with a step size of 0.1 A.
+1) Step 1: Set the motor operating speed reference to a constant value and start it under no-load conditions, then proceed to Step 2. The speed reference range during the data collection process is constrained to 0.5 Hz or lower. The initial speed reference was configured at 0.5 Hz. Afterwards, each time it returns to Step 1, the set speed reference decreases by 0.1Hz in sequence (e.g., 0.4 Hz in the second iteration) until reaching 0 Hz.
+2) Step 2: Apply a constant load torque under the predefined speed reference from Step 1, then proceed to Step 3. The load torque applied in this study ranges from 0% to ±100%, including both motoring and generating torques. Similarly, for each speed reference, the applied load torque starts at 0% and increases by 10% each time Step 2 is revisited. Among them, the load torque first increases in the form of generating mode. When the load torque reaches -100% (rated generating torque), it resets to no-load and increases by 10% in the motoring mode until the load torque reaches +100% (rated motoring torque).
+3) Step 3: Under the predefined speed reference and load torque conditions, incrementally increase the d-axis current reference. Following data collection for all d-axis current variations under the current speed-torque combination, proceed to Step 4. Data acquisition initiates at the minimum d-axis current reference   that can ensure stable motor operation under the predefined speed reference and load torque. The d-axis current reference value systematically increases by 0.1 A within a certain time interval (aimed at capturing a complete fundamental cycle of the α β - frame AC variable) until it reaches the rated current threshold.
+4) Step 4: After collecting the input variable data corresponding to different d-axis current references for all load torque sizes under the current speed reference, proceed to Step 5. Otherwise, return to Step 2.
+5) Step 5: If all input variable data under all speed reference and load torque combinations have been collected, proceed to Step 6. Otherwise, return to Step 1.
+6) Step 6: End the data acquisition and conduct data processing.
+
